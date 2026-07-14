@@ -1,3 +1,4 @@
+// FILE: frontend/src/App.tsx
 import { useEffect, useState } from 'react';
 import { api, getToken } from './api';
 
@@ -9,7 +10,7 @@ export default function App() {
   return <MainApp onLogout={() => { localStorage.removeItem('token'); setToken(null); }} />;
 }
 
-function AuthScreen({ onAuth }: { onAuth: (t: string) => void }) {
+export function AuthScreen({ onAuth }: { onAuth: (t: string) => void }) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -41,7 +42,7 @@ function AuthScreen({ onAuth }: { onAuth: (t: string) => void }) {
   );
 }
 
-function MainApp({ onLogout }: { onLogout: () => void }) {
+export function MainApp({ onLogout }: { onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>('dashboard');
   const tabs: Tab[] = ['dashboard', 'accounts', 'transactions', 'categories', 'budgets'];
   return (
@@ -66,7 +67,7 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
   );
 }
 
-function Dashboard() {
+export function Dashboard() {
   const [summary, setSummary] = useState<any>(null);
   const [trend, setTrend] = useState<any[]>([]);
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -79,6 +80,7 @@ function Dashboard() {
   return (
     <div className="space-y-6">
       <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="border rounded p-2" />
+      {!summary && <p className="text-gray-500" role="status">Loading dashboard…</p>}
       {summary && (
         <div className="grid grid-cols-3 gap-4">
           <Stat label="Income" value={summary.income} color="text-green-600" />
@@ -100,6 +102,9 @@ function Dashboard() {
             );
           })}
         </div>
+      )}
+      {summary && summary.budgetVsActual?.length === 0 && (
+        <p className="text-gray-500 text-sm">No budgets set for this month yet.</p>
       )}
       {trend.length > 0 && (
         <div className="bg-white p-4 rounded shadow">
@@ -124,7 +129,7 @@ function Dashboard() {
   );
 }
 
-function Stat({ label, value, color }: { label: string; value: number; color: string }) {
+export function Stat({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div className="bg-white p-4 rounded shadow">
       <p className="text-sm text-gray-500">{label}</p>
@@ -133,12 +138,13 @@ function Stat({ label, value, color }: { label: string; value: number; color: st
   );
 }
 
-function Accounts() {
+export function Accounts() {
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [name, setName] = useState('');
   const [type, setType] = useState('bank');
 
-  const load = () => api('/accounts').then(setAccounts).catch(() => {});
+  const load = () => api('/accounts').then((a) => { setAccounts(a); setLoaded(true); }).catch(() => setLoaded(true));
   useEffect(() => { load(); }, []);
 
   async function add(e: React.FormEvent) {
@@ -147,6 +153,8 @@ function Accounts() {
     setName(''); load();
   }
   async function archive(id: string) { await api(`/accounts/${id}`, { method: 'DELETE' }); load(); }
+
+  const active = accounts.filter((a) => !a.archivedAt);
 
   return (
     <div className="space-y-4">
@@ -157,8 +165,9 @@ function Accounts() {
         </select>
         <button className="bg-blue-600 text-white rounded px-4">Add</button>
       </form>
+      {loaded && active.length === 0 && <p className="text-gray-500 text-sm">No accounts yet. Add your first account above.</p>}
       <div className="bg-white rounded shadow divide-y">
-        {accounts.filter((a) => !a.archivedAt).map((a) => (
+        {active.map((a) => (
           <div key={a._id} className="p-3 flex justify-between items-center">
             <span>{a.name} <span className="text-xs text-gray-500">({a.type})</span></span>
             <div className="flex items-center gap-3">
@@ -172,11 +181,12 @@ function Accounts() {
   );
 }
 
-function Categories() {
+export function Categories() {
   const [categories, setCategories] = useState<any[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [name, setName] = useState('');
   const [type, setType] = useState('expense');
-  const load = () => api('/categories').then(setCategories).catch(() => {});
+  const load = () => api('/categories').then((c) => { setCategories(c); setLoaded(true); }).catch(() => setLoaded(true));
   useEffect(() => { load(); }, []);
 
   async function add(e: React.FormEvent) {
@@ -195,6 +205,7 @@ function Categories() {
         </select>
         <button className="bg-blue-600 text-white rounded px-4">Add</button>
       </form>
+      {loaded && categories.length === 0 && <p className="text-gray-500 text-sm">No categories yet.</p>}
       <div className="bg-white rounded shadow divide-y">
         {categories.map((c) => (
           <div key={c._id} className="p-3 flex justify-between items-center">
@@ -207,8 +218,9 @@ function Categories() {
   );
 }
 
-function Transactions() {
+export function Transactions() {
   const [txs, setTxs] = useState<any[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [accounts, setAccounts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [form, setForm] = useState<any>({ type: 'expense', date: new Date().toISOString().slice(0, 10), amount: '', accountId: '', categoryId: '', note: '', transferAccountId: '' });
@@ -217,7 +229,7 @@ function Transactions() {
 
   const load = () => {
     const params = new URLSearchParams(Object.entries(filters).filter(([, v]) => v)).toString();
-    api(`/transactions${params ? `?${params}` : ''}`).then(setTxs).catch(() => {});
+    api(`/transactions${params ? `?${params}` : ''}`).then((t) => { setTxs(t); setLoaded(true); }).catch(() => setLoaded(true));
   };
   useEffect(() => { load(); }, [filters]);
   useEffect(() => { api('/accounts').then(setAccounts); api('/categories').then(setCategories); }, []);
@@ -268,6 +280,7 @@ function Transactions() {
         <button onClick={exportCsv} className="bg-gray-200 rounded px-3">Export CSV</button>
       </div>
 
+      {loaded && txs.length === 0 && <p className="text-gray-500 text-sm">No transactions match the current filters.</p>}
       <div className="bg-white rounded shadow divide-y">
         {txs.map((t) => (
           <div key={t._id} className="p-3 flex justify-between items-center text-sm">
@@ -283,14 +296,15 @@ function Transactions() {
   );
 }
 
-function Budgets() {
+export function Budgets() {
   const [categories, setCategories] = useState<any[]>([]);
   const [budgets, setBudgets] = useState<any[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
   const [categoryId, setCategoryId] = useState('');
   const [amount, setAmount] = useState('');
 
-  const load = () => api(`/budgets?month=${month}`).then(setBudgets).catch(() => {});
+  const load = () => api(`/budgets?month=${month}`).then((b) => { setBudgets(b); setLoaded(true); }).catch(() => setLoaded(true));
   useEffect(() => { api('/categories').then((c) => setCategories(c.filter((x: any) => x.type === 'expense'))); }, []);
   useEffect(() => { load(); }, [month]);
 
@@ -310,6 +324,7 @@ function Budgets() {
         <input className="border rounded p-2" type="number" step="0.01" placeholder="Monthly amount" value={amount} onChange={(e) => setAmount(e.target.value)} required />
         <button className="bg-blue-600 text-white rounded px-4">Set Budget</button>
       </form>
+      {loaded && budgets.length === 0 && <p className="text-gray-500 text-sm">No budgets set for this month.</p>}
       <div className="bg-white rounded shadow divide-y">
         {budgets.map((b) => (
           <div key={b._id} className="p-3 flex justify-between"><span>{b.categoryId?.name}</span><span>{b.amount.toFixed(2)}</span></div>
