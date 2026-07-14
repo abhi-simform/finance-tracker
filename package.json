@@ -1,0 +1,12 @@
+{
+  "name": "finance-tracker",
+  "private": true,
+  "workspaces": ["api", "frontend"],
+  "scripts": {
+    "dev": "concurrently -k \"npm run dev -w api\" \"npm run dev -w frontend\"",
+    "build": "npm run build -w frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
