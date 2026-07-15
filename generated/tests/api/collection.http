@@ -1,0 +1,65 @@
+### Todo API Collection — VS Code REST Client
+### Story coverage: US-001..US-006
+@baseUrl = http://localhost:3001/api/todos
+
+### Story: US-006, AC: 1 — List all todos
+GET {{baseUrl}}
+Accept: application/json
+
+### Story: US-001, AC: 1 — Create a valid todo
+# @name createTodo
+POST {{baseUrl}}
+Content-Type: application/json
+
+{
+  "text": "Buy groceries"
+}
+
+### Story: US-001, AC: 2 — Create a todo with empty text -> 400
+POST {{baseUrl}}
+Content-Type: application/json
+
+{
+  "text": ""
+}
+
+### Story: US-001, AC: 2 — Create a todo with whitespace-only text -> 400
+POST {{baseUrl}}
+Content-Type: application/json
+
+{
+  "text": "   "
+}
+
+### Story: US-002, AC: 1 — Toggle a todo's completed state
+PUT {{baseUrl}}/{{createTodo.response.body.id}}
+Content-Type: application/json
+
+{
+  "completed": true
+}
+
+### Story: US-002, AC: 2 — Update a non-existent todo -> 404
+PUT {{baseUrl}}/does-not-exist
+Content-Type: application/json
+
+{
+  "completed": true
+}
+
+### Story: US-001, AC: 3 — Update a todo to empty text -> 400
+PUT {{baseUrl}}/{{createTodo.response.body.id}}
+Content-Type: application/json
+
+{
+  "text": "   "
+}
+
+### Story: US-003, AC: 1 — Delete a todo -> 204
+DELETE {{baseUrl}}/{{createTodo.response.body.id}}
+
+### Story: US-003, AC: 2 — Delete a non-existent todo -> 404
+DELETE {{baseUrl}}/does-not-exist
+
+### Story: US-005, AC: 1 — Clear completed todos
+POST {{baseUrl}}/clear-completed
