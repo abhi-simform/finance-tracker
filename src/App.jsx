@@ -1,48 +1,92 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 
-const STORAGE_KEY = 'todo-app-items'
-
-function loadTodos() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch {
-    return []
-  }
-}
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/todos'
 
 export default function App() {
-  const [todos, setTodos] = useState(loadTodos)
+  const [todos, setTodos] = useState([])
   const [text, setText] = useState('')
   const [filter, setFilter] = useState('all') // all | active | completed
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const fetchTodos = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const res = await fetch(API_URL)
+      if (!res.ok) throw new Error('Failed to load todos')
+      const data = await res.json()
+      setTodos(data)
+    } catch (err) {
+      setError(err.message || 'Failed to load todos')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(todos))
-  }, [todos])
+    fetchTodos()
+  }, [fetchTodos])
 
-  function addTodo(e) {
+  async function addTodo(e) {
     e.preventDefault()
     const trimmed = text.trim()
     if (!trimmed) return
-    setTodos((prev) => [
-      ...prev,
-      { id: Date.now().toString(), text: trimmed, completed: false }
-    ])
-    setText('')
+    try {
+      setError(null)
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: trimmed })
+      })
+      if (!res.ok) throw new Error('Failed to add todo')
+      const created = await res.json()
+      setTodos((prev) => [...prev, created])
+      setText('')
+    } catch (err) {
+      setError(err.message || 'Failed to add todo')
+    }
   }
 
-  function toggleTodo(id) {
-    setTodos((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
-    )
+  async function toggleTodo(id) {
+    const todo = todos.find((t) => t.id === id)
+    if (!todo) return
+    try {
+      setError(null)
+      const res = await fetch(`${API_URL}/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completed: !todo.completed })
+      })
+      if (!res.ok) throw new Error('Failed to update todo')
+      const updated = await res.json()
+      setTodos((prev) => prev.map((t) => (t.id === id ? updated : t)))
+    } catch (err) {
+      setError(err.message || 'Failed to update todo')
+    }
   }
 
-  function deleteTodo(id) {
-    setTodos((prev) => prev.filter((t) => t.id !== id))
+  async function deleteTodo(id) {
+    try {
+      setError(null)
+      const res = await fetch(`${API_URL}/${id}`, { method: 'DELETE' })
+      if (!res.ok && res.status !== 204) throw new Error('Failed to delete todo')
+      setTodos((prev) => prev.filter((t) => t.id !== id))
+    } catch (err) {
+      setError(err.message || 'Failed to delete todo')
+    }
   }
 
-  function clearCompleted() {
-    setTodos((prev) => prev.filter((t) => !t.completed))
+  async function clearCompleted() {
+    try {
+      setError(null)
+      const res = await fetch(`${API_URL}/clear-completed`, { method: 'POST' })
+      if (!res.ok) throw new Error('Failed to clear completed todos')
+      const remaining = await res.json()
+      setTodos(remaining)
+    } catch (err) {
+      setError(err.message || 'Failed to clear completed todos')
+    }
   }
 
   const filtered = todos.filter((t) => {
@@ -58,6 +102,12 @@ export default function App() {
       <h1 className="text-3xl font-bold text-center text-slate-800 mb-6">
         Todo App
       </h1>
+
+      {error && (
+        <p className="text-center text-red-500 text-sm mb-4" data-testid="error-message">
+          {error}
+        </p>
+      )}
 
       <form onSubmit={addTodo} className="flex gap-2 mb-4" data-testid="todo-form">
         <input
@@ -78,43 +128,49 @@ export default function App() {
       </form>
 
       <div className="bg-white rounded-md shadow divide-y" data-testid="todo-list">
-        {filtered.length === 0 && (
+        {loading && (
+          <p className="text-center text-slate-400 py-6" data-testid="loading-state">
+            Loading...
+          </p>
+        )}
+        {!loading && filtered.length === 0 && (
           <p className="text-center text-slate-400 py-6" data-testid="empty-state">
             No tasks yet.
           </p>
         )}
-        {filtered.map((todo) => (
-          <div
-            key={todo.id}
-            className="flex items-center justify-between px-4 py-3"
-            data-testid="todo-item"
-          >
-            <label className="flex items-center gap-3 cursor-pointer flex-1">
-              <input
-                type="checkbox"
-                checked={todo.completed}
-                onChange={() => toggleTodo(todo.id)}
-                data-testid="todo-checkbox"
-              />
-              <span
-                className={
-                  todo.completed
-                    ? 'line-through text-slate-400'
-                    : 'text-slate-800'
-                }
-              >
-                {todo.text}
-              </span>
-            </label>
-            <button
-              onClick={() => deleteTodo(todo.id)}
-              data-testid="delete-btn"
-              className="text-red-500 hover:text-red-700 text-sm ml-2"
+        {!loading &&
+          filtered.map((todo) => (
+            <div
+              key={todo.id}
+              className="flex items-center justify-between px-4 py-3"
+              data-testid="todo-item"
             >
-              Delete
-            </button>
-          </div>
-        ))}
+              <label className="flex items-center gap-3 cursor-pointer flex-1">
+                <input
+                  type="checkbox"
+                  checked={todo.completed}
+                  onChange={() => toggleTodo(todo.id)}
+                  data-testid="todo-checkbox"
+                />
+                <span
+                  className={
+                    todo.completed
+                      ? 'line-through text-slate-400'
+                      : 'text-slate-800'
+                  }
+                >
+                  {todo.text}
+                </span>
+              </label>
+              <button
+                onClick={() => deleteTodo(todo.id)}
+                data-testid="delete-btn"
+                className="text-red-500 hover:text-red-700 text-sm ml-2"
+              >
+                Delete
+              </button>
+            </div>
+          ))}
       </div>
 
       <div className="flex items-center justify-between mt-4 text-sm text-slate-600">

@@ -1,13 +1,15 @@
+// Express routes for the Todo resource (shared list, no auth required).
 import { Router } from 'express';
-import * as todoController from '../controllers/todoController.js';
-import { requireAuth } from '../middleware/authMiddleware.js';
 
-const router = Router();
-router.use(requireAuth);
-router.get('/', todoController.list);
-router.get('/:id', todoController.getOne);
-router.post('/', todoController.create);
-router.put('/:id', todoController.update);
-router.delete('/:id', todoController.remove);
+export function createTodoRoutes(controller) {
+  const router = Router();
+  router.get('/', controller.list);
+  router.post('/clear-completed', controller.clearCompleted);
+  router.get('/:id', controller.getOne);
+  router.post('/', controller.create);
+  router.put('/:id', controller.update);
+  router.delete('/:id', controller.remove);
+  return router;
+}
 
-export default router;
+export default createTodoRoutes;

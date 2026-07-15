@@ -1,62 +1,66 @@
-// Business logic for Todo CRUD operations, scoped per authenticated user.
-import * as db from '../store/db.js';
+// Business logic for Todo CRUD operations. Persistence is delegated to an
+// injected store (in-memory by default, MongoDB in production) so the same
+// service works in tests and against a real database.
+import { createMemoryTodoStore } from '../store/memoryTodoStore.js';
 
-export function listTodos(userId) {
-  return db.listTodosByUser(userId);
-}
-
-export function getTodo(id, userId) {
-  const todo = db.findTodoById(id, userId);
-  if (!todo) {
-    const err = new Error('Todo not found');
-    err.status = 404;
-    throw err;
+export class TodoService {
+  constructor(store = createMemoryTodoStore()) {
+    this.store = store;
   }
-  return todo;
-}
 
-export function createTodo(userId, { text } = {}) {
-  if (!text || !text.trim()) {
-    const err = new Error('Text is required');
-    err.status = 400;
-    throw err;
+  async getAll() {
+    return this.store.getAll();
   }
-  return db.createTodo({ userId, text: text.trim() });
-}
 
-export function updateTodo(id, userId, updates = {}) {
-  const allowed = {};
-  if (updates.text !== undefined) {
-    if (!updates.text.trim()) {
-      const err = new Error('Text cannot be empty');
+  async create({ text } = {}) {
+    if (!text || !text.trim()) {
+      const err = new Error('Text is required');
       err.status = 400;
       throw err;
     }
-    allowed.text = updates.text.trim();
+    return this.store.create({ text: text.trim() });
   }
-  if (updates.completed !== undefined) {
-    if (typeof updates.completed !== 'boolean') {
-      const err = new Error('completed must be a boolean');
-      err.status = 400;
+
+  async update(id, updates = {}) {
+    const allowed = {};
+    if (updates.text !== undefined) {
+      if (!updates.text.trim()) {
+        const err = new Error('Text cannot be empty');
+        err.status = 400;
+        throw err;
+      }
+      allowed.text = updates.text.trim();
+    }
+    if (updates.completed !== undefined) {
+      if (typeof updates.completed !== 'boolean') {
+        const err = new Error('completed must be a boolean');
+        err.status = 400;
+        throw err;
+      }
+      allowed.completed = updates.completed;
+    }
+    const todo = await this.store.update(id, allowed);
+    if (!todo) {
+      const err = new Error('Todo not found');
+      err.status = 404;
       throw err;
     }
-    allowed.completed = updates.completed;
+    return todo;
   }
-  const todo = db.updateTodo(id, userId, allowed);
-  if (!todo) {
-    const err = new Error('Todo not found');
-    err.status = 404;
-    throw err;
+
+  async delete(id) {
+    const success = await this.store.delete(id);
+    if (!success) {
+      const err = new Error('Todo not found');
+      err.status = 404;
+      throw err;
+    }
+    return true;
   }
-  return todo;
+
+  async clearCompleted() {
+    return this.store.clearCompleted();
+  }
 }
 
-export function deleteTodo(id, userId) {
-  const success = db.deleteTodo(id, userId);
-  if (!success) {
-    const err = new Error('Todo not found');
-    err.status = 404;
-    throw err;
-  }
-  return true;
-}
+export default TodoService;

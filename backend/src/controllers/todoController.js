@@ -1,47 +1,67 @@
-// HTTP request handlers for the Todo resource.
-import * as todoService from '../services/todoService.js';
+// HTTP request handlers for the Todo resource. Built via a factory so a
+// TodoService instance (in-memory for tests, MongoDB-backed in production)
+// can be injected.
+export function createTodoController(service) {
+  return {
+    async list(req, res, next) {
+      try {
+        const todos = await service.getAll();
+        res.status(200).json(todos);
+      } catch (err) {
+        next(err);
+      }
+    },
 
-export function list(req, res) {
-  try {
-    const todos = todoService.listTodos(req.userId);
-    return res.status(200).json(todos);
-  } catch (err) {
-    return res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
-  }
+    async getOne(req, res, next) {
+      try {
+        const todo = await service.getAll().then((all) => all.find((t) => t.id === req.params.id));
+        if (!todo) {
+          const err = new Error('Todo not found');
+          err.status = 404;
+          throw err;
+        }
+        res.status(200).json(todo);
+      } catch (err) {
+        next(err);
+      }
+    },
+
+    async create(req, res, next) {
+      try {
+        const todo = await service.create(req.body || {});
+        res.status(201).json(todo);
+      } catch (err) {
+        next(err);
+      }
+    },
+
+    async update(req, res, next) {
+      try {
+        const todo = await service.update(req.params.id, req.body || {});
+        res.status(200).json(todo);
+      } catch (err) {
+        next(err);
+      }
+    },
+
+    async remove(req, res, next) {
+      try {
+        await service.delete(req.params.id);
+        res.status(204).send();
+      } catch (err) {
+        next(err);
+      }
+    },
+
+    async clearCompleted(req, res, next) {
+      try {
+        const todos = await service.clearCompleted();
+        res.status(200).json(todos);
+      } catch (err) {
+        next(err);
+      }
+    }
+  };
 }
 
-export function getOne(req, res) {
-  try {
-    const todo = todoService.getTodo(req.params.id, req.userId);
-    return res.status(200).json(todo);
-  } catch (err) {
-    return res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
-  }
-}
-
-export function create(req, res) {
-  try {
-    const todo = todoService.createTodo(req.userId, req.body || {});
-    return res.status(201).json(todo);
-  } catch (err) {
-    return res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
-  }
-}
-
-export function update(req, res) {
-  try {
-    const todo = todoService.updateTodo(req.params.id, req.userId, req.body || {});
-    return res.status(200).json(todo);
-  } catch (err) {
-    return res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
-  }
-}
-
-export function remove(req, res) {
-  try {
-    todoService.deleteTodo(req.params.id, req.userId);
-    return res.status(204).send();
-  } catch (err) {
-    return res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
-  }
-}
+export default createTodoController;

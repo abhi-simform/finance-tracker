@@ -3,6 +3,7 @@ import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from '../../../src/App';
+import { installMockFetch } from '../helpers/mockFetch';
 
 // NOTE: src/App.jsx currently renders the todo list inline (no extracted
 // <TodoItem>/<TodoList> component yet). These tests exercise that rendered
@@ -10,13 +11,15 @@ import App from '../../../src/App';
 
 describe('Todo list rendering (component-level)', () => {
   beforeEach(() => {
-    window.localStorage.clear();
+    installMockFetch();
   });
 
   async function addTodo(text: string) {
     const user = userEvent.setup();
+    await screen.findByTestId('empty-state');
     await user.type(screen.getByTestId('todo-input'), text);
     await user.click(screen.getByTestId('add-btn'));
+    await screen.findByText(text);
     return user;
   }
 
@@ -37,7 +40,7 @@ describe('Todo list rendering (component-level)', () => {
     const checkbox = screen.getByTestId('todo-checkbox');
     expect(screen.getByText('Style me')).not.toHaveClass('line-through');
     await user.click(checkbox);
-    expect(screen.getByText('Style me')).toHaveClass('line-through');
+    expect(await screen.findByText('Style me')).toHaveClass('line-through');
   });
 
   // Story: US-004, AC: 3
