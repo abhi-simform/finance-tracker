@@ -2,9 +2,14 @@
   "name": "todo-backend",
   "version": "1.0.0",
   "private": true,
-  "description": "Express API for Todo webapp (in-memory store). Deps are installed at repo root; see /package.json.",
+  "type": "module",
+  "description": "Express API for Todo webapp (in-memory store).",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5"
   }
 }
